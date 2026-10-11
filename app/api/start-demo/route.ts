@@ -62,14 +62,34 @@ server.listen(3001, "0.0.0.0", () => {
             },
         ]);
 
-        const result = await sandbox.runCommand({
+        await sandbox.runCommand({
             cmd: "node",
             args: ["server.js"],
             detached: true,
         });
 
-        if (result.exitCode !== 0) {
-            throw new Error("Could not start the demo server");
+        // Wait until the HTTP server is responding.
+        let ready = false;
+
+        for (let i = 0; i < 20; i++) {
+            const check = await sandbox.runCommand({
+                cmd: "bash",
+                args: [
+                    "-lc",
+                    "curl -fsS http://127.0.0.1:3001 >/dev/null && echo READY || true",
+                ],
+            });
+
+            if ((await check.stdout()).includes("READY")) {
+                ready = true;
+                break;
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+
+        if (!ready) {
+            throw new Error("Demo server did not become ready on port 3001");
         }
 
         return Response.json({
