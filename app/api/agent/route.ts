@@ -48,6 +48,25 @@ const executeInSandbox = tool(
 
 export async function POST(request: Request) {
   try {
+    const secret = process.env.AGENT_API_SECRET;
+
+    if (!secret) {
+      console.error("AGENT_API_SECRET is not configured.");
+
+      return Response.json(
+        { error: "Server configuration error." },
+        { status: 500 },
+      );
+    }
+
+    if (
+      request.headers.get("authorization") !== `Bearer ${secret}`
+    ) {
+      return Response.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
     const body = await request.json();
 
     if (
@@ -61,14 +80,14 @@ export async function POST(request: Request) {
       );
     }
     const model = new ChatOpenAI({
-    model: "gc/grok-4.7",
-    temperature: 0,
-    apiKey: process.env.OMNIROUTE_API_KEY,
-    maxTokens: 1024,
-    configuration: {
+      model: "gc/grok-4.7",
+      temperature: 0,
+      apiKey: process.env.OMNIROUTE_API_KEY,
+      maxTokens: 1024,
+      configuration: {
         baseURL: process.env.OMNIROUTE_BASE_URL?.trim(),
-    },
-});
+      },
+    });
 
     const agent = await createDeepAgent({
       model,
