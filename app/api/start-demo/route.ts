@@ -2,33 +2,33 @@
 import { Sandbox } from "@vercel/sandbox";
 
 export async function POST(request: Request) {
-  const secret = process.env.AGENT_API_SECRET;
+    const secret = process.env.AGENT_API_SECRET;
 
-  if (!secret) {
-    return Response.json(
-      { error: "Server configuration error" },
-      { status: 500 },
-    );
-  }
+    if (!secret) {
+        return Response.json(
+            { error: "Server configuration error" },
+            { status: 500 },
+        );
+    }
 
-  if (
-    request.headers.get("authorization") !== `Bearer ${secret}`
-  ) {
-    return Response.json(
-      { error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
+    if (
+        request.headers.get("authorization") !== `Bearer ${secret}`
+    ) {
+        return Response.json(
+            { error: "Unauthorized" },
+            { status: 401 },
+        );
+    }
 
-  let sandbox: Sandbox | undefined;
+    let sandbox: Sandbox | undefined;
 
-  try {
-    sandbox = await Sandbox.create({
-      ports: [3001],
-      timeout: 10 * 60 * 1000,
-    });
+    try {
+        sandbox = await Sandbox.create({
+            ports: [3001],
+            timeout: 10 * 60 * 1000,
+        });
 
-    const serverCode = `
+        const serverCode = `
 const http = require("node:http");
 
 const server = http.createServer((req, res) => {
@@ -55,39 +55,41 @@ server.listen(3001, "0.0.0.0", () => {
 });
 `;
 
-    await sandbox.writeFiles([
-      {
-        path: "server.js",
-        content: serverCode,
-      },
-    ]);
+        await sandbox.writeFiles([
+            {
+                path: "server.js",
+                content: serverCode,
+            },
+        ]);
 
-    const result = await sandbox.runCommand({
-      cmd: "node",
-      args: ["server.js"],
-      detached: true,
-    });
+        const result = await sandbox.runCommand({
+            cmd: "node",
+            args: ["server.js"],
+            detached: true,
+        });
 
-    if (result.exitCode !== 0) {
-      throw new Error("Could not start the demo server");
+        if (result.exitCode !== 0) {
+            throw new Error("Could not start the demo server");
+        }
+
+        return Response.json({
+            success: true,
+            message: "Hello World server started",
+            port: 3001,
+            url: sandbox.domain(3001),
+        });
+    } catch (error) {
+        console.error("Failed to start demo server:", error);
+
+        if (sandbox) {
+            await sandbox.stop().catch((stopError) => {
+                console.error("Failed to stop sandbox:", stopError);
+            });
+        }
+
+        return Response.json(
+            { error: "Failed to start the demo server. Check Vercel runtime logs." },
+            { status: 500 },
+        );
     }
-
-    return Response.json({
-      success: true,
-      message: "Hello World server started",
-      port: 3001,
-      url: sandbox.domain(3001),
-    });
-  } catch (error) {
-    if (sandbox) {
-      await sandbox.stop().catch(() => {});
-    }
-
-    console.error("Failed to start demo:", error);
-
-    return Response.json(
-      { error: "Failed to start the demo server" },
-      { status: 500 },
-    );
-  }
 }
